@@ -1,0 +1,9 @@
+{
+    "version": 4,
+    "vendor": {
+        "conan": {}
+    },
+    "include": [
+        "C:\\Workspace\\github.com\\zhangxianbing\\cpp_utils\\build\\CMakePresets.json"
+    ]
+}

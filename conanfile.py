@@ -13,4 +13,4 @@ class CompressorRecipe(ConanFile):
         self.copy("*", src="lib", dst=os.path.join(root_dir, "deps/lib"))
 
     def requirements(self):
-        self.requires("gtest/1.13.0")
+        self.requires("gtest/1.11.0")
