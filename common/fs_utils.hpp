@@ -2,11 +2,9 @@
 #pragma once
 
 #ifdef _WIN32
-
 #include <Shlwapi.h>
 #include <direct.h>
 #include <windows.h>
-
 #else
 #include <dirent.h>
 #include <errno.h>
@@ -429,6 +427,64 @@ inline std::string basename(const std::string &path) {
 }
 
 /**
+ * Lists the contents of a directory specified by the given path, filtered by
+ * the provided filter function.
+ *
+ * @param path The path of the directory to list.
+ * @param filter The filter function to apply to the directory contents. Only
+ * files that pass the filter will be included in the result.
+ * @return A vector of strings representing the names of the files in the
+ * directory that passed the filter.
+ */
+inline std::vector<std::string> list_dir(
+    const std::string &path,
+    const std::function<bool(const std::string &)> &filter) {
+  std::vector<std::string> filenames;
+
+  struct dirent **namelist;
+  int n = scandir(path.c_str(), &namelist, nullptr, versionsort);
+  if (n >= 0) {
+    for (int i = 0; i < n; ++i) {
+      auto f = namelist[i];
+      if (f->d_type == DT_REG && filter(f->d_name)) {
+        filenames.emplace_back(f->d_name);
+      }
+      free(f);
+    }
+    free(namelist);
+  }
+
+  return filenames;
+}
+
+/**
+ * Lists all files in the specified directory that have the specified
+ * extensions.
+ *
+ * @param path The path to the directory to list files from.
+ * @param exts A vector of file extensions to filter by. If empty, all files
+ * will be returned.
+ * @return A vector of file paths in the specified directory that have the
+ * specified extensions.
+ */
+inline std::vector<std::string> list_dir(
+    const std::string &path, const std::vector<std::string> &exts = {}) {
+  std::vector<std::string> filenames;
+
+  auto filter = [&](const std::string &filename) {
+    if (exts.empty()) {
+      return true;
+    }
+    std::string ext = get_file_ext(filename);
+    return std::find(exts.begin(), exts.end(), ext) != exts.end();
+  };
+
+  filenames = list_dir(path, filter);
+
+  return filenames;
+}
+
+/**
  * @brief Recursively walks a directory tree and returns information about each
  * directory and file encountered
  *
@@ -477,8 +533,7 @@ path_walk(const std::string &root_path) {
         INVALID_HANDLE_VALUE) {
       do {
         std::string filename = data.cFileName;
-        if (filename == "." || filename == "..")
-          continue;
+        if (filename == "." || filename == "..") continue;
 
         std::string filepath = subdir + path_separator + filename;
         if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
@@ -668,25 +723,40 @@ inline bool is_online_video(const std::string &url) {
       [&](const std::string &protocol) { return url.find(protocol) == 0; });
 }
 
-///// 列出目录 path 下所有图片文件名（按自然排序）
-// inline std::vector<std::string> list_images(const std::string &path = ".") {
-//   std::vector<std::string> filenames;
-//
-//   struct dirent **namelist;
-//   int n = scandir(path.c_str(), &namelist, nullptr, versionsort);
-//   if (n >= 0) {
-//     for (int i = 0; i < n; ++i) {
-//       auto f = namelist[i];
-//       if (f->d_type == DT_REG && is_image(f->d_name)) {
-//         filenames.emplace_back(f->d_name);
-//       }
-//       free(f);
-//     }
-//     free(namelist);
-//   }
-//
-//   return filenames;
-// }
+/**
+ * @brief Lists all image files in the specified directory.
+ *
+ * This function returns a vector of strings containing the names of all image
+ * files (i.e., files with extensions .jpg, .jpeg, .png, .bmp, .gif) in the
+ * specified directory.
+ *
+ * @param path The path to the directory to search for image files. Defaults to
+ * the current directory.
+ *
+ * @return A vector of strings containing the names of all image files in the
+ * specified directory.
+ */
+inline std::vector<std::string> list_images(const std::string &path = ".") {
+  return list_dir(path, is_image);
+}
+
+/**
+ * @brief Lists all video files in the specified directory.
+ *
+ * This function returns a vector of strings containing the names of all video
+ * files (i.e., files with extensions .avi, .mp4, .mkv, .mov, .wmv, .flv, .f4v,
+ * .rmvb, .rm, .3gp, .dat, .ts, .mts, .vob, .mpg, .mpeg, .m4v, .webm) in the
+ * specified directory.
+ *
+ * @param path The path to the directory to search for video files. Defaults to
+ * the current directory.
+ *
+ * @return A vector of strings containing the names of all video files in the
+ * specified directory.
+ */
+inline std::vector<std::string> list_videos(const std::string &path = ".") {
+  return list_dir(path, is_video);
+}
 
 // ==============================================================================================
 //                                         文件读写
@@ -710,7 +780,7 @@ inline void read_file_to_string(const std::string &infile,
 inline std::string read_file(const std::string &infile) {
   std::string s;
   read_file_to_string(infile, s);
-  return s; // RVO
+  return s;  // RVO
 }
 
-} // namespace
+}  // namespace
